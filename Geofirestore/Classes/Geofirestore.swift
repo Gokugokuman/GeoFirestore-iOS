@@ -1,8 +1,11 @@
+//Changed by Shoya Sakamoto, 9/30/2018
+
 import Foundation
 import CoreLocation
 import FirebaseCore
 import FirebaseFirestore
 import GeoFire
+import FirebaseDatabase
 
 public extension GeoPoint {
     class func geopointWithLocation(location: CLLocation) -> GeoPoint {
@@ -42,7 +45,7 @@ public class GeoFirestore {
      * The dispatch queue this GeoFirestore object and all its GFSQueries use for callbacks.
      */
     internal var callbackQueue: DispatchQueue
-    
+
     /** @name Creating new `GeoFirestore` objects */
     
     /**
@@ -179,8 +182,8 @@ public enum GFSEventType {
 }
 
 
-
-public typealias GFSQueryResultBlock = (String?, CLLocation?) -> Void
+//added variable: DocumentSnapshot by Shoya
+public typealias GFSQueryResultBlock = (String?, CLLocation?, DocumentSnapshot?) -> Void
 public typealias GFSReadyBlock = () -> Void
 public typealias GFSQueryHandle = UInt
 
@@ -198,6 +201,7 @@ public class GFSQuery {
     internal class GFSQueryLocationInfo {
         var isInQuery: Bool?
         var location: CLLocation?
+        var snapshot: DocumentSnapshot?//added by Shoya
         var geoHash: GFGeoHash?
     }
     
@@ -205,11 +209,6 @@ public class GFSQuery {
      * The GeoFirestore this GFSQuery object uses.
      */
     public var geoFirestore: GeoFirestore
-    
-    /**
-     * Limits the number of results from our Query
-     */
-    public var searchLimit: Int?
     
     internal var locationInfos = [String: GFSQueryLocationInfo]()
     internal var queries = Set<GFGeoHashQuery>()
@@ -220,7 +219,7 @@ public class GFSQuery {
     internal var keyExitedObservers = [GFSQueryHandle: GFSQueryResultBlock]()
     internal var keyMovedObservers = [GFSQueryHandle: GFSQueryResultBlock]()
     internal var readyObservers = [GFSQueryHandle: GFSReadyBlock]()
-    
+
     internal var currentHandle: UInt
     
     internal var listenerForHandle = [GFSQueryHandle: ListenerRegistration]()
@@ -232,11 +231,7 @@ public class GFSQuery {
     }
     
     internal func fireStoreQueryForGeoHashQuery(query: GFGeoHashQuery) -> Query {
-        var query = self.geoFirestore.collectionRef.order(by: "g").whereField("g", isGreaterThanOrEqualTo: query.startValue).whereField("g", isLessThanOrEqualTo: query.endValue)
-        if let limit = self.searchLimit {
-            query = query.limit(to: limit)
-        }
-        return query
+        return self.geoFirestore.collectionRef.order(by: "g").whereField("g", isGreaterThanOrEqualTo: query.startValue).whereField("g", isLessThanOrEqualTo: query.endValue)
     }
     
     //overriden
@@ -248,7 +243,8 @@ public class GFSQuery {
         fatalError("Override in subclass.")
     }
     
-    internal func updateLocationInfo(_ location: CLLocation, forKey key: String) {
+    //added variable: snapshot by Shoya
+    internal func updateLocationInfo(_ location: CLLocation, forKey key: String, snapshot: DocumentSnapshot?) {
         var info: GFSQueryLocationInfo? = locationInfos[key]
         var isNew = false
         if info == nil {
@@ -263,24 +259,26 @@ public class GFSQuery {
         // we know it exists now so force unwrap is ok
         info!.location = location
         info!.isInQuery = locationIsInQuery(loc: location)
+        //print("info!.isInQuery", info!.isInQuery)
         info!.geoHash = GFGeoHash.new(withLocation: location.coordinate)
         
-        if (isNew || !(wasInQuery ?? false)) && info?.isInQuery != nil {
+        //if (isNew || !(wasInQuery ?? false)) && info?.isInQuery != nil {
+        if (isNew || !(wasInQuery ?? false)) && info?.isInQuery == true {//added by Shoya
             for (offset: _, element: (key: _, value: block)) in keyEnteredObservers.enumerated() {
                 self.geoFirestore.callbackQueue.async {
-                    block(key, info!.location)
+                    block(key, info!.location, snapshot)//added variable: snapshot by Shoya
                 }
             }
-        } else if !isNew && changedLocation && info?.isInQuery != nil {
+        } else if !isNew && changedLocation && info?.isInQuery == true {//changed by Shoya from info?.isInQuery != nil
             for (offset: _, element: (key: _, value: block)) in keyMovedObservers.enumerated() {
                 self.geoFirestore.callbackQueue.async {
-                    block(key, info!.location)
+                    block(key, info!.location, snapshot)//added variable: snapshot by Shoya
                 }
             }
-        } else if wasInQuery ?? false && info?.isInQuery == nil {
+        } else if wasInQuery ?? false && info?.isInQuery == true {//changed by Shoya from info?.isInQuery != nil
             for (offset: _, element: (key: _, value: block)) in keyExitedObservers.enumerated() {
                 self.geoFirestore.callbackQueue.async {
-                    block(key, info!.location)
+                    block(key, info!.location, snapshot)//added variable: snapshot by Shoya
                 }
             }
         }
@@ -302,7 +300,7 @@ public class GFSQuery {
             let l = snapshot?.get("l") as? [Double?]
             if let lat = l?[0], let lon = l?[1], let key = snapshot?.documentID {
                 let location = CLLocation(latitude: lat, longitude: lon)
-                updateLocationInfo(location, forKey: key)
+                updateLocationInfo(location, forKey: key, snapshot: snapshot)//added variable: snapshot by Shoya
             }else{
                 //TODO: error??
             }
@@ -317,7 +315,7 @@ public class GFSQuery {
             let l = snapshot?.get("l") as? [Double?]
             if let lat = l?[0], let lon = l?[1], let key = snapshot?.documentID {
                 let location = CLLocation(latitude: lat, longitude: lon)
-                updateLocationInfo(location, forKey: key)
+                updateLocationInfo(location, forKey: key, snapshot: snapshot)//added variable: snapshot by Shoya
             }else{
                 //TODO: error??
             }
@@ -334,7 +332,7 @@ public class GFSQuery {
                 var info: GFSQueryLocationInfo? = nil
                 let key = snapshot.documentID
                 info = locationInfos[key]
-                if info != nil{
+                if info != nil{                            
                     let l = snapshot.get("l") as? [Double?]
                     if let lat = l?[0], let lon = l?[1]{
                         let location = CLLocation(latitude: lat, longitude: lon)
@@ -349,7 +347,7 @@ public class GFSQuery {
                             if info?.isInQuery != nil {
                                 for (offset: _, element: (key: _, value: block)) in self.keyExitedObservers.enumerated() {
                                     self.geoFirestore.callbackQueue.async {
-                                        block(key, info!.location)
+                                        block(key, info!.location, snapshot)//added variable: snapshot by Shoya
                                     }
                                 }
                             }
@@ -399,7 +397,7 @@ public class GFSQuery {
                 handle!.childAddedListener?.remove()
                 handle!.childRemovedListener?.remove()
                 handle!.childChangedListener?.remove()
-                
+
                 self.handles.removeValue(forKey: query)
                 self.outstandingQueries.remove(query)
                 
@@ -458,11 +456,11 @@ public class GFSQuery {
                 
             }
         }
-        
+
         queries = newQueries as! Set<GFGeoHashQuery>
         for (offset: _, element: (key: key, value: info)) in self.locationInfos.enumerated(){
             if let location = info.location{
-                self.updateLocationInfo(location, forKey: key)
+                self.updateLocationInfo(location, forKey: key, snapshot: nil)//added snapshot:nil by Shoya
             }
         }
         var oldLocations = [String]()
@@ -474,18 +472,23 @@ public class GFSQuery {
         for k in oldLocations { locationInfos.removeValue(forKey: k) }
         checkAndFireReadyEvent()
     }
-    
-    internal func reset() {
-        for query in queries {
-            guard let handle = self.handles[query] else {
-                NSException.raise(.internalInconsistencyException, format: "Wanted to remove a geohash query that was not registered!", arguments: getVaList(["nil"]))
-                return
-            }
-            handle.childAddedListener?.remove()
-            handle.childChangedListener?.remove()
-            handle.childRemovedListener?.remove()
-        }
 
+    internal func reset() {
+        if !queries.isEmpty {
+            for query: GFGeoHashQuery? in queries {
+                var handle: GFSGeoHashQueryListener?
+                if let aQuery = query {
+                    handle = self.handles[aQuery]
+                    if handle == nil {
+                        NSException.raise(.internalInconsistencyException, format: "Wanted to remove a geohash query that was not registered!", arguments: getVaList(["nil"]))
+                    }
+                    handle?.childAddedListener?.remove()
+                    handle?.childChangedListener?.remove()
+                    handle?.childRemovedListener?.remove()
+                }
+                
+            }
+        }
         locationInfos.removeAll()
         queries.removeAll()
         handles.removeAll()
@@ -532,7 +535,7 @@ public class GFSQuery {
                     lockQueue.sync {
                         for (offset: _, element: (key: key, value: info)) in self.locationInfos.enumerated(){
                             if info.isInQuery != nil{
-                                block(key, info.location)
+                                block(key, info.location, nil)
                             }
                         }
                     }
@@ -551,7 +554,7 @@ public class GFSQuery {
             }
         }
         return firebaseHandle
-        
+
     }
     
     /**
@@ -647,6 +650,8 @@ public class GFSCircleQuery: GFSQuery {
     }
     
     override internal func locationIsInQuery(loc: CLLocation) -> Bool {
+        //print("距離", loc.distance(from: self.center), "半径",self.radius*1000)
+        //print(loc.distance(from: self.center) <= (self.radius * 1000.0))
         return loc.distance(from: self.center) <= (self.radius * 1000.0)
     }
     

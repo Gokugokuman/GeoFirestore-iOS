@@ -8,7 +8,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'Geofirestore'
-  s.version          = '1.0.0'
+  s.version          = '1.1.0'
   s.summary          = 'Realtime location queries with Firebase Cloud Firestore.'
 
 # This description is used to generate tags and improve search results.
@@ -43,9 +43,9 @@ An alternative to the GeoFire library provided by Firebase, but compatible with 
   
   s.static_framework = true
   
-  s.dependency 'Firebase', '~> 5.4'
+  # s.dependency 'Firebase', '~> 5.4'
   s.dependency 'GeoFire', '~> 3.0'
-  s.dependency 'FirebaseCore', '~> 5.0'
-  s.dependency 'FirebaseFirestore', '~> 1.0'
+  # s.dependency 'FirebaseCore', '~> 5.0'
+  # s.dependency 'FirebaseFirestore', '~> 1.0'
 
 end

@@ -652,7 +652,8 @@ public class GFSCircleQuery: GFSQuery {
     override internal func locationIsInQuery(loc: CLLocation) -> Bool {
         //print("距離", loc.distance(from: self.center), "半径",self.radius*1000)
         //print(loc.distance(from: self.center) <= (self.radius * 1000.0))
-        return loc.distance(from: self.center) <= (self.radius * 1000.0)
+        //return loc.distance(from: self.center) <= (self.radius * 1000.0)
+        return true//loc.distance(from: self.center) <= (self.radius * 1000.0)
     }
     
     override internal func queriesForCurrentCriteria() -> Set<AnyHashable> {

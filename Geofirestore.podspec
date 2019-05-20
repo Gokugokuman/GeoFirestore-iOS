@@ -25,7 +25,7 @@ An alternative to the GeoFire library provided by Firebase, but compatible with 
   # s.screenshots     = 'www.example.com/screenshots_1', 'www.example.com/screenshots_2'
   s.license          = { :type => 'MIT', :file => 'LICENSE' }
   s.author           = { 'Dhruv Shah' => 'dhruv.shah@gmail.com', 'Nikhil Sridhar' => 'nik.sridhar@gmail.com' }
-  s.source           = { :git => 'https://github.com/imperiumlabs/Geofirestore.git', :tag => s.version.to_s }
+  s.source           = { :git => 'https://github.com/Gokugokuman/GeoFirestore-iOS.git', :tag => s.version.to_s }
   # s.social_media_url = 'https://twitter.com/<TWITTER_USERNAME>'
 
   s.ios.deployment_target = '9.0'
